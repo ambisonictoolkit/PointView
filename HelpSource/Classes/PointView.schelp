@@ -62,11 +62,11 @@ be shown. Connections can be toggled on and off with link::#-showConnections::.
 Default connections are set to sequential indices
 code::[[0, 1, ... numPoints-1]]::.
 
-METHOD:: rotateMode
-Set the order of rotations when applying compound rotations to the points.
-code::'rtt':: for Rotate-Tilt-Tumble, code::'ypr':: Yaw-Pitch-Roll.
-
-
+METHOD:: connectTriplets
+Set an link::Classes/Array:: of link::Classes/Array::s, each listing the indices of
+points in groups of three that form a triangular mesh across the points. This
+method is more efficient than setting connections to be the triplets directly,
+because it avoids repeated connections.
 
 
 SUBSECTION::Movement: rotation
@@ -74,7 +74,7 @@ SUBSECTION::Movement: rotation
 METHOD:: rotate
 METHOD:: tilt
 METHOD:: tumble
-The rotation of the view, on each axis, in radians. Default positive directions
+The rotation of the displayed points, on each axis, in radians. Default positive directions
 are:
 list::
 ##strong::rotate::: counter-clockwise
@@ -92,6 +92,10 @@ above) while code::-1:: will invert the direction of rotation.
 
 METHOD:: reset
 Reset rotations to defaults. (code::rotate = -45.degrad, tilt = 0, tumble = 0::)
+
+METHOD:: rotateMode
+Set the order of rotations when applying compound rotations to the points.
+code::'rtt':: for Rotate-Tilt-Tumble, code::'ypr':: Yaw-Pitch-Roll.
 
 
 SUBSECTION::Movement: animation
@@ -299,7 +303,7 @@ automatically.
 SUBSECTION:: Internal properties
 
 METHOD:: userView
-Returns the link::Classes/UserView:: which is used for the underlying display.
+Returns the link::Classes/UserView:: which is used for drawing the point display.
 
 METHOD:: pointsNorm
 Return the link::Classes/Array:: of link::Classes/Cartesian:: points used
@@ -309,7 +313,72 @@ internally for plotting. i.e. normalized to a radius of 1.
 EXAMPLES::
 
 code::
-(some example code)
+(
+// directions of a 13-point t-design
+var dirs = [
+	[ 0.0, 1.571 ], [ 0.0, 0.564 ], [ 1.571, 0.564 ],
+	[ 3.142, 0.564 ], [ -1.571, 0.564 ], [ 0.0, -0.046 ],
+	[ -1.571, -0.046 ], [ 3.142, -0.046 ], [ 1.571, -0.046 ],
+	[ 0.0, -0.831 ], [ -1.571, -0.831 ], [ 3.142, -0.831 ],
+	[ 1.571, -0.831 ]
+];
+
+~pv = PointView().directions_(dirs).front
+)
+
+(
+// highlight all points above the horizon
+var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
+~pv.highlightPoints(highPnts, Color.yellow);
+)
+
+// remove the highlight
+~pv.removeHighlight;
+
+// connect points with lines
+~pv.connections_((0 .. ~pv.points.size-1).clump(2))
+
+(
+// ...or connect points that form a triangular mesh.
+// This method is more efficient than setting
+// connections to be the triplets directly, because
+// some connections will be repeated
+~pv.connectTriplets_([
+	[ 0, 1, 2 ], [ 0, 1, 4 ], [ 0, 2, 3 ],
+	[ 0, 3, 4 ], [ 1, 2, 8 ], [ 1, 4, 6 ],
+	[ 1, 5, 6 ], [ 1, 5, 8 ], [ 2, 3, 7 ],
+	[ 2, 7, 8 ], [ 3, 4, 6 ], [ 3, 6, 7 ],
+	[ 5, 6, 10 ], [ 5, 8, 12 ], [ 5, 9, 10 ],
+	[ 5, 9, 12 ], [ 6, 7, 11 ], [ 6, 10, 11 ],
+	[ 7, 8, 12 ], [ 7, 11, 12 ], [ 9, 10, 11 ],
+	[ 9, 11, 12 ]
+])
+)
+
+// set random point colors
+~pv.pointColors_(~pv.points.size.collect{ Color.rand })
+// set point colors to a hue range
+~pv.pointHueRange_(0.75, 0.95);
+
+// group points by color
+~pv.colorGroups_([(0..4),(5..8),(9..12)])
+// need to set the group colors...
+~pv.groupColors_([Color.red, Color.green, Color.yellow])
+
+// rotate the perspective
+~pv.rotate_(25.degrad)
+~pv.tumble_(45.degrad)
+~pv.reset
+
+// orthographic projection down the Z axis
+~pv.setOrtho('-Z')
+// back to perspective view
+~pv.setPerspective
+
+~pv.showConnections = false;
+
+// more options can be explored in the GUI!
+
 ::
 
-PRIVATE:: perspectiveView, drawFunc, makePerspectiveView, baseTilt, baseRotation, baseTumble, cen, rotatePhase, rotationView, cycTilt, cycRotate, cycTumble, oscTilt, oscRotate, oscTumble, prUpdateColors, randomizedAxes, prCheckAnimate, showView, initInteractions, makeShowView, rotatePhase, tiltPhase, tumblePhase, minDim, update, updateCanvasDims, layItOut, rotateStep, init
+PRIVATE:: perspectiveView, drawFunc, makePerspectiveView, baseTilt, baseRotation, baseTumble, cen, rotatePhase, rotationView, cycTilt, cycRotate, cycTumble, oscTilt, oscRotate, oscTumble, prUpdateColors, randomizedAxes, prCheckAnimate, showView, initInteractions, makeShowView, rotatePhase, tiltPhase, tumblePhase, minDim, update, updateCanvasDims, layItOut, rotateStep, init, reduceTriplets

@@ -22,7 +22,6 @@ PointView : View {
 	var prevColors, highlighted = false;
 	var connectionColor, indicesColor;
 	var connStrokeWidthNear = 3, connStrokeWidthFar;
-
 	var <groupColors, <colorGroups, defaultGroupColor;
 
 	// movement
@@ -47,6 +46,9 @@ PointView : View {
 
 	// views
 	var <userView, <rotationView, <showView, <perspectiveView;
+
+	// other
+	var sdClass;
 
 
 	*new { |parent, bounds = (Rect(0,0, 1000, 715))|
@@ -73,9 +75,11 @@ PointView : View {
 		randomVariance = 0.15;
 		connectionColor = Color.blue.alpha_(0.1);
 		indicesColor = Color.black;
-		groupColors = Color.red;
+		groupColors = [Color.red];
 		defaultGroupColor = Color.gray.alpha_(0.3);
 		connStrokeWidthFar = connStrokeWidthNear * pointDistScale;
+
+		sdClass = \SphericalDesign.asClass; // support for SphericalDesign without explicit dependency
 
 		userView = UserView(this, this.bounds.origin_(0@0))
 		.resize_(5)
@@ -251,44 +255,27 @@ PointView : View {
 
 		triBut = Button()
 		.action_({
-			var triplets, pairsDone, pairs, connPairs, wrapped;
+			var triplets, connPairs, warning;
+
 			statusTxt.string_("Triangulating points...");
 			fork({
-				try {
-					triplets = SphericalDesign().points_(points).calcTriplets.triplets;
-					// reduce to point pairs to remove repeated lines
-					connPairs = [];
-					pairsDone = []; // list of pairs already found
-
-					triplets.do{ |trip|
-						wrapped = (trip ++ trip.first);
-						3.collect({ |i|
-							[wrapped[i], wrapped[i+1]]
-						}).do{ |pair|
-							// if (pairsDone.includes(pair).not) {
-							if (
-								pairsDone.any({ |pdone|
-									{ |me| me[0] == pair[0] and: { me[1] == pair[1] } }.matchItem(pdone)
-								}).not
-							) {
-								connPairs = connPairs.add(pair);         // add pair to connection list
-								pairsDone = pairsDone.add(pair);         // keep track of a duple that's been used
-								pairsDone = pairsDone.add(pair.reverse); // the reverse pair is identical
-							};
-
-						}
-					};
-
-					this.connections_(connPairs);
-					statusTxt.string_("");
+				if (\SphericalDesign.asClass.isNil) {
+					warning = "SphericalDesign quark is required to compute triangulation."
 				} {
-					var str = "Couldn't calulate the triangulation of points :(";
-					statusTxt.string_(str);
-					str.warn;
-					defer {
-						3.wait;
+					try {
+						triplets = SphericalDesign().points_(points).calcTriplets.triplets;
+						connPairs = this.reduceTriplets(triplets);
+						this.connections_(connPairs);
 						statusTxt.string_("");
+					} {
+						warning = "Couldn't calulate the triangulation of points :(";
 					};
+				};
+
+				warning !? {
+					statusTxt.string_(warning);
+					warning.warn;
+					defer { 3.wait; statusTxt.string_("") };
 				};
 
 			}, AppClock);
@@ -1129,6 +1116,11 @@ PointView : View {
 		};
 	}
 
+	// arrayOfIndices: triplets of indices of connected points
+	connectTriplets_ { |arrayOfIndices|
+		this.connections_(this.reduceTriplets(arrayOfIndices));
+	}
+
 	axisColors_ { |colorArray|
 		axisColors = colorArray;
 		this.changed(\axisColors, *axisColors);
@@ -1199,7 +1191,7 @@ PointView : View {
 			var npnts, ngrps, cnt = 0;
 
 			npnts = this.points.size;
-			ngrps = arrayOfColors.size;
+			ngrps = groupColors.size;
 
 			colorGroups = Array.fill(ngrps, { Array.new } );
 
@@ -1215,9 +1207,10 @@ PointView : View {
 					cnt = cnt + 1;
 				}
 			};
+		};
 
-			this.colorGroups_(colorGroups);
-		}
+		this.colorGroups_(colorGroups);
+
 	}
 
 	// Set groups of point indices which belong to each color in
@@ -1245,8 +1238,8 @@ PointView : View {
 
 	highlightPoints { |arrayOfIndices, highlightColor = (Color.red), defaultColor = (Color.gray.alpha_(0.25))|
 		prevColors = prPntDrawCols.copy;
-		this.pointColors_(highlightColor);
-		this.colorGroups_([arrayOfIndices], defaultColor);
+		this.groupColors_(highlightColor, defaultColor);
+		this.colorGroups_([arrayOfIndices]);
 		highlighted = true;
 	}
 
@@ -1335,31 +1328,74 @@ PointView : View {
 		this.refresh;
 	}
 
-	update { |who, what ... args|
-		if (who.isKindOf(SphericalDesign)) {
-			switch (what,
-				\points, {
-					if (who.triplets == connections) {
-						// triplets still match connections, don't reset them
-						this.points_(who.points, false) // don't reset connections, assume
-					} {
-						// connections are no longer valid with the new points
-						this.points_(who.points, true) // reset connections
-					}
-				},
-				// when triplets change, it's assumed that connections are the triplets
-				\triplets, {
-					if (args[0]) {
-						// new triplets:
-						this.connections_(who.triplets)
-					} {
-						// triplets removed and not recalculated
-						connections = nil;
-						this.showConnections_(false);
-					}
+	// reduce triplets to pairs of connections so lines aren't
+	// drawn multiple times. returns array of index pairs
+	reduceTriplets { |tripletArray|
+		var pairsDone, retPairs, wrapped;
+		// reduce to point pairs to remove repeated lines
+		retPairs = [];
+		pairsDone = []; // list of pairs already found
 
-				}
-			)
+		tripletArray.do{ |trip|
+			wrapped = (trip ++ trip.first);
+			3.collect({ |i|
+				[wrapped[i], wrapped[i+1]]
+			}).do{ |pair|
+				// if (pairsDone.includes(pair).not) {
+				if (
+					pairsDone.any({ |pdone|
+						{ |me| me[0] == pair[0] and: { me[1] == pair[1] } }.matchItem(pdone)
+					}).not
+				) {
+					retPairs = retPairs.add(pair);         // add pair to connection list
+					pairsDone = pairsDone.add(pair);         // keep track of a duple that's been used
+					pairsDone = pairsDone.add(pair.reverse); // the reverse pair is identical
+				};
+
+			}
+		};
+
+		^retPairs
+	}
+
+	update { |who, what ... args|
+
+		// Support for SphericalDesign class
+		// It's assumed that connections are the design's
+		// triplets if they have been calculated (triplets.notNil).
+		if (sdClass.notNil) {
+			if (who.isKindOf(sdClass)) {
+				var triplets;
+
+				switch (what,
+					\points, {
+						if (who.triplets.notNil and: {
+							who.triplets.flat.maxItem <= who.points.size
+						}) {
+							// assume triplets are still valid, don't reset connections
+							// user can SphericalDesign:-resetTriplets to explicitly clear them
+							// it's more expensive to recalculate them with high point counts
+							this.points_(who.points, false)
+						} {
+							// connections are no longer valid with the new points
+							this.points_(who.points, true) // reset connections
+						}
+					},
+					// when triplets change, it's assumed that connections are the triplets
+					\triplets, {
+						if (args[0]) {
+							// new triplets
+							triplets = who.triplets;
+							this.connections_(this.reduceTriplets(triplets))
+						} {
+							// triplets removed and not recalculated
+							connections = nil;
+							this.showConnections_(false);
+						}
+
+					}
+				)
+			}
 		};
 	}
 
@@ -1369,12 +1405,18 @@ PointView : View {
 
 /*
 
-Usage
+Basic usage:
 
 (
-t = TDesign(15).visualize(bounds: [200,200, 1200,700].asRect, showConnections: true)
+t = TDesign(13).visualize(bounds: [200,200, 1200,700].asRect, showConnections: true)
 )
 
+t.rotate_(0.25pi)
+t.tilt_(-0.25pi)
+t.reset
+t.calcTriplets
+t.mirrorX
+t.resetTriplets
 
 t.view.highlightPoints_( (4..7), Color.yellow )
 // highlight all points +Z
@@ -1383,8 +1425,71 @@ t.view.highlightPoints_((0..t.numPoints-1).select({|i| t.points[i].z > 0}))
 // connect pairs
 t.view.connections_((0..t.points.size-1).clump(2))
 
-t.rotate(0.25pi)
-t.tilt(-0.25pi)
-t.reset
+*/
+
+/*
+
+// directions of a 13-point t-design
+var dirs = [
+	[ 0.0, 1.571 ], [ 0.0, 0.564 ], [ 1.571, 0.564 ],
+	[ 3.142, 0.564 ], [ -1.571, 0.564 ], [ 0.0, -0.046 ],
+	[ -1.571, -0.046 ], [ 3.142, -0.046 ], [ 1.571, -0.046 ],
+	[ 0.0, -0.831 ], [ -1.571, -0.831 ], [ 3.142, -0.831 ],
+	[ 1.571, -0.831 ]
+];
+
+~pv = PointView().directions_(dirs).front
+)
+
+(
+// highlight all points above the horizon
+var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
+~pv.highlightPoints(highPnts, Color.yellow);
+)
+
+// remove the highlight
+~pv.removeHighlight;
+
+// connect points with lines
+~pv.connections_((0 .. ~pv.points.size-1).clump(2))
+
+(
+// ...or connect points that form a triangular mesh.
+// This method is more efficient than setting
+// connections to be the triplets directly, because
+// some connections will be repeated
+~pv.connectTriplets_([
+	[ 0, 1, 2 ], [ 0, 1, 4 ], [ 0, 2, 3 ],
+	[ 0, 3, 4 ], [ 1, 2, 8 ], [ 1, 4, 6 ],
+	[ 1, 5, 6 ], [ 1, 5, 8 ], [ 2, 3, 7 ],
+	[ 2, 7, 8 ], [ 3, 4, 6 ], [ 3, 6, 7 ],
+	[ 5, 6, 10 ], [ 5, 8, 12 ], [ 5, 9, 10 ],
+	[ 5, 9, 12 ], [ 6, 7, 11 ], [ 6, 10, 11 ],
+	[ 7, 8, 12 ], [ 7, 11, 12 ], [ 9, 10, 11 ],
+	[ 9, 11, 12 ]
+])
+)
+
+// set random point colors
+~pv.pointColors_(~pv.points.size.collect{ Color.rand })
+// set point colors to a hue range
+~pv.pointHueRange_(0.75, 0.95);
+
+// group points by color
+~pv.colorGroups_([(0..4),(5..8),(9..12)])
+// need to set the group colors...
+~pv.groupColors_([Color.red, Color.green, Color.yellow])
+
+// rotate the perspective
+~pv.rotate_(25.degrad)
+~pv.tumble_(45.degrad)
+~pv.reset
+
+// orthographic projection down the Z axis
+~pv.setOrtho('-Z')
+// back to perspective view
+~pv.setPerspective
+
+~pv.showConnections = false;
 
 */
