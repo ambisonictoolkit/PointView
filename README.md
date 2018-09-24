@@ -13,7 +13,7 @@ built into the view, though these methods and more are available for more
 elaborate display of the points.
 
 ![PointView Interface]
-(https://github.com/ambisonictoolkit/PointView/blob/master/HelpSource/img/PointView_interface.png)
+(HelpSource/img/PointView_interface.png)
 
 Installing
 ==========
