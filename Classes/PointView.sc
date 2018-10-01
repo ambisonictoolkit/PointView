@@ -1269,10 +1269,11 @@ PointView : View {
 	prUpdateColors {
 		var hues, sat, val, alpha;
 		if (colsByHue) {
-			hues = prPntDrawCols.collect(_.hue);
-			sat = prPntDrawCols.first.sat;
-			val = prPntDrawCols.first.val;
-			alpha = prPntDrawCols.first.alpha;
+			var colsHSV = prPntDrawCols.collect(_.asHSV);
+			hues = colsHSV.collect({arg col; col[0];}); // hue values
+			sat = colsHSV.first[1]; // saturation
+			val = colsHSV.first[2]; //val
+			alpha = colsHSV.first[3]; // alpha
 			this.pointHueRange_(hues.minItem, hues.maxItem, sat, val, alpha, huesScrambled);
 		};
 
