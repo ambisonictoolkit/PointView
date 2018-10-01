@@ -41,7 +41,6 @@ PointView : View {
 	var <randomizedAxes;   // dictionary of booleans for randomize state of each axis
 	var <>randomVariance;  // normalized value to apply to movement speed if randomized
 	var extrinsicRotation = false; // flag if mouse interaction requires additional extrinsic rotation
-	var exRot = 0, exTum = 0, prevExRot = 0, prevExTum = 0;
 	var rotPxStep = 1;
 
 	// views
@@ -551,12 +550,6 @@ PointView : View {
 						}
 					}
 				);
-
-				// perform additional rotation from mouse
-				// interaction after model rotation
-				if (extrinsicRotation and: { ortho.not }) {
-					rotated = rotated.collect{ |pnt| pnt.rotate(exRot).tumble(exTum) }
-				};
 
 				// orient so view matches ambisonics and return
 				rotated.collect{ |pnt| pnt.rotate(0.5pi).tilt(0.5pi) };
@@ -1294,10 +1287,15 @@ PointView : View {
 			var deltaX, deltaY;
 
 			extrinsicRotation = true;
-			deltaX = x - mouseDownPnt.x;
-			deltaY = y - mouseDownPnt.y;
-			exRot = prevExRot + (deltaX * rotPxStep);
-			exTum = prevExTum + (deltaY * rotPxStep);
+			deltaX = x - mouseMovePnt.x;
+			deltaY = y - mouseMovePnt.y;
+			this.rotate_(
+				wrap( this.rotate + (deltaX * rotPxStep), -1pi, 1pi)
+			);
+			this.tumble_(
+				wrap( this.tumble + (deltaY * rotPxStep), -1pi, 1pi )
+			);
+
 			mouseMovePnt = x@y;
 
 			this.refresh;
@@ -1310,8 +1308,6 @@ PointView : View {
 
 		userView.mouseUpAction_({ |v,x,y, modifiers|
 			mouseUpPnt = x@y;
-			prevExRot = exRot;
-			prevExTum = exTum;
 		});
 	}
 
@@ -1322,7 +1318,6 @@ PointView : View {
 	// reset rotations
 	reset {
 		extrinsicRotation = false; // flag if mouse interaction requires additional extrinsic rotation
-		exRot = exTum = prevExRot = prevExTum = 0;
 		this.rotate_(-45.degrad).tilt_(0).tumble_(0);
 		this.allOsc_(false).allCyc_(false);
 		this.refresh;
