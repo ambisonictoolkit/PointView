@@ -25,6 +25,7 @@ PointView : View {
 	var connectionColor, indicesColor;
 	var connStrokeWidthNear = 4, connStrokeWidthFar;
 	var <groupColors, <colorGroups, defaultGroupColor;
+	var connChk;
 
 	// movement
 	var <baseRotation, <baseTilt, <baseTumble; // radians, rotations before any movement offsets are applied
@@ -47,6 +48,7 @@ PointView : View {
 	var rotPxStep = 1;
 
 	// views
+	// TODO: showView, perspectiveView should follow MVC design like rotationsView
 	var <userView, <rotationView, <showView, <perspectiveView;
 
 	// other
@@ -220,10 +222,11 @@ PointView : View {
 		);
 		}
 
+	// TODO: should move to its own class and follow MVC design
 	makeShowView {
 		var axChk, axLenSl;
 		var indcChk;
-		var connChk, triBut, seqBut, origBut, statusTxt;
+		var triBut, seqBut, origBut, statusTxt; // connChk < temp made global
 
 		statusTxt = StaticText().string_("").align_(\center).stringColor_(Color.gray);
 
@@ -258,27 +261,20 @@ PointView : View {
 		triBut = Button()
 		.action_({
 			var warning, triplets;
-
-			statusTxt.string_("Triangulating points...");
 			fork({
+				statusTxt.string_("Triangulating points...");
+				0.1.wait;
 				if (\SphericalDesign.asClass.isNil) {
 					warning = "SphericalDesign quark is required to compute triangulation.".warn;
 					statusTxt.string_(warning);
+					defer { 3.wait; statusTxt.string_("") };
 				} {
 					triplets = this.triangulatePoints;
 					// reduce triplets, call this method again with connections array
 					triplets !? { this.connectTriplets_(triplets) };
 					statusTxt.string_("");
 				};
-
-				warning !? {
-
-					warning.warn;
-					defer { 3.wait; statusTxt.string_("") };
-				};
-
 			}, AppClock);
-			connChk.valueAction_(true);
 		})
 		.states_([["Triangulation"]])
 		.maxHeight_(25)
@@ -332,6 +328,7 @@ PointView : View {
 		);
 	}
 
+	// TODO: should move to its own class and follow MVC design
 	makePerspectiveView {
 		var xposChk, xnegChk, yposChk, ynegChk, zposChk, znegChk;
 		var skxSl, skySl, trxSl, trySl;
@@ -1141,6 +1138,7 @@ PointView : View {
 	showConnections_ { |bool|
 		showConnections = bool;
 		this.changed(\showConnections, bool);
+		connChk.value_(bool); // TODO: temp
 		this.refresh;
 	}
 
@@ -1177,8 +1175,7 @@ PointView : View {
 			connections = conn;
 			close !? { closeConnections = close };
 			if (update) {
-				showConnections = true;
-				this.refresh;
+				this.showConnections_(true); // refresh
 			};
 		}
 	}
