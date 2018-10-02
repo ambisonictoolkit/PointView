@@ -8,10 +8,11 @@ PointView : View {
 	var <cen, <minDim;
 	var <skewX = 0, <skewY = -0.95;
 	var <translateX = 0, <translateY = 0.8;
-	var az, bz = 3;               // perspective parameters, see originDist_, eyeDist_
-	var <showIndices = true;      // show indices of points
-	var <showAxes = true;         // show world axes
-	var <showConnections = false; // show connections between points
+	var az, bz = 3;                // perspective parameters, see originDist_, eyeDist_
+	var <showIndices = true;       // show indices of points
+	var <showAxes = true;          // show world axes
+	var <showConnections = false;  // show connections between points
+	var <closeConnections = false; // connect end and start point of connection groups
 	var perspective = true, ortho = false, orthoAxis = '+X', orthoRotations, orthoOffset;
 	var xyz, <axisColors, <axisScale = 0.2;
 	var frameRate = 25;
@@ -22,7 +23,7 @@ PointView : View {
 	var <pointSizeScales;          // scalars for the size of each point
 	var prevColors, highlighted = false;
 	var connectionColor, indicesColor;
-	var connStrokeWidthNear = 3, connStrokeWidthFar;
+	var connStrokeWidthNear = 4, connStrokeWidthFar;
 	var <groupColors, <colorGroups, defaultGroupColor;
 
 	// movement
@@ -211,7 +212,7 @@ PointView : View {
 				).spacing_(20),
 
 				rotationView.maxWidth_(430).visible_(false),
-				showView.maxWidth_(330).visible_(false),
+				showView.maxWidth_(380).visible_(false),
 				perspectiveView.maxWidth_(430).visible_(false),
 
 				nil
@@ -222,7 +223,7 @@ PointView : View {
 	makeShowView {
 		var axChk, axLenSl;
 		var indcChk;
-		var connChk, triBut, seqBut, statusTxt;
+		var connChk, triBut, seqBut, origBut, statusTxt;
 
 		statusTxt = StaticText().string_("").align_(\center).stringColor_(Color.gray);
 
@@ -256,25 +257,22 @@ PointView : View {
 
 		triBut = Button()
 		.action_({
-			var triplets, connPairs, warning;
+			var warning, triplets;
 
 			statusTxt.string_("Triangulating points...");
 			fork({
 				if (\SphericalDesign.asClass.isNil) {
-					warning = "SphericalDesign quark is required to compute triangulation."
+					warning = "SphericalDesign quark is required to compute triangulation.".warn;
+					statusTxt.string_(warning);
 				} {
-					try {
-						triplets = SphericalDesign().points_(points).calcTriplets.triplets;
-						connPairs = this.reduceTriplets(triplets);
-						this.connections_(connPairs);
-						statusTxt.string_("");
-					} {
-						warning = "Couldn't calulate the triangulation of points :(";
-					};
+					triplets = this.triangulatePoints;
+					// reduce triplets, call this method again with connections array
+					triplets !? { this.connectTriplets_(triplets) };
+					statusTxt.string_("");
 				};
 
 				warning !? {
-					statusTxt.string_(warning);
+
 					warning.warn;
 					defer { 3.wait; statusTxt.string_("") };
 				};
@@ -288,11 +286,21 @@ PointView : View {
 
 		seqBut = Button()
 		.action_({
-			this.connections_([(0..points.size-1)]);
+			this.connections_(\sequential, close: false);
 			connChk.valueAction_(true);
 		})
 		.states_([["Sequential"]])
 		.maxHeight_(25)
+		;
+
+		origBut = Button()
+		.action_({
+			this.connections_(\origin);
+			connChk.valueAction_(true);
+		})
+		.states_([["Origin"]])
+		.maxHeight_(25)
+		.maxWidth_(50)
 		;
 
 		showView = View().layout_(
@@ -314,8 +322,10 @@ PointView : View {
 					StaticText().string_("Connections").align_(\left),
 					nil,
 					triBut,
-					10,
-					seqBut
+					3,
+					seqBut,
+					3,
+					origBut
 				),
 				statusTxt,
 			)
@@ -675,7 +685,7 @@ PointView : View {
 
 					Pen.strokeColor_(axisColors[i]);
 					Pen.moveTo(axPnts_xf[0]);
-					Pen.width_(lineDpth.linlin(-1.0,1.0, connStrokeWidthNear, connStrokeWidthFar));
+					Pen.width_(lineDpth.linlin(-0.6,0.6, connStrokeWidthNear, connStrokeWidthFar));
 					Pen.lineTo(axPnt);
 					Pen.stroke;
 
@@ -700,22 +710,42 @@ PointView : View {
 
 			// draw connecting lines
 			if (showConnections and: { connections.notNil }) {
-				connections.do{ |set, i|
-					var pDpths;
+				var pDpths;
 
-					// collect and average the depth between pairs of connected points
-					pDpths = set.collect(pnt_depths[_]);
-					pDpths = pDpths + pDpths.rotate(-1) / 2;
+				Pen.strokeColor_(connectionColor);
 
-					Pen.strokeColor_(connectionColor);
-					Pen.moveTo(pnts_xf.at(set[0]));
+				if (connections == \origin) { // connect all points to the origin
+					pDpths = this.numPoints.collect(pnt_depths[_] * 0.5); // split depth between point an origin
 
-					set.rotate(-1).do{ |idx, j|
+					pDpths.do{ |depth, idx|
 						// change line width with depth
-						Pen.width_(pDpths[j].lincurve(-1.0,1.0, connStrokeWidthNear, connStrokeWidthFar, -3.5));
+						Pen.width_(depth.lincurve(-0.5, 0.5, connStrokeWidthNear, connStrokeWidthFar, -3.5));
+						Pen.moveTo(axPnts_xf[0]);
 						Pen.lineTo(pnts_xf[idx]);
 						Pen.stroke;
-						Pen.moveTo(pnts_xf[idx]);
+					}
+				} {
+					connections.do{ |set, i|
+						var conns;
+						// collect and average the depth between pairs of connected points
+						pDpths = set.collect(pnt_depths[_]);
+						pDpths = pDpths + pDpths.rotate(-1) / 2;
+
+						Pen.moveTo(pnts_xf.at(set[0]));
+
+						conns = if (closeConnections and: { set.size > 2 }) {
+							set.rotate(-1)
+						} {
+							set.drop(1)
+						};
+
+						conns.do{ |idx, j|
+							// change line width with depth
+							Pen.width_(pDpths[j].lincurve(-0.8,0.8, connStrokeWidthNear, connStrokeWidthFar, -3.5));
+							Pen.lineTo(pnts_xf[idx]);
+							Pen.stroke;
+							Pen.moveTo(pnts_xf[idx]);
+						};
 					};
 				};
 
@@ -1116,17 +1146,58 @@ PointView : View {
 
 	// draw lines between these indices of points
 	// e.g. [[1,3],[0,5],[2,4]]
-	connections_ { |arraysOfIndices, update = true|
-		if (arraysOfIndices.rank != 2) {
-			"[PointView:-connections_] arraysOfIndices argument "
-			"is not an array with rank == 2.".throw
+	connections_ { |indicesOrKey, close, update = true|
+		var conn, triplets;
+
+		case
+		{ indicesOrKey.isKindOf(Symbol) } {
+			switch(indicesOrKey,
+				\origin, {
+					conn = \origin
+				},
+				\sequential, {
+					conn = [(0..this.numPoints-1)];
+				},
+				\triangulation, {
+					triplets = this.triangulatePoints;
+					// reduce triplets, call this method again with connections array
+					triplets !? { this.connectTriplets_(triplets) };
+				}
+			);
+		}
+		{ indicesOrKey.isKindOf(Array) } {
+			if (indicesOrKey.rank != 2) {
+				"[PointView:-connections_] indicesOrKey argument "
+				"is not an array with rank == 2.".throw
+			};
+			conn = indicesOrKey;
 		};
 
-		connections = arraysOfIndices;
-		if (update) {
-			showConnections = true;
-			this.refresh;
+		conn !? {
+			connections = conn;
+			close !? { closeConnections = close };
+			if (update) {
+				showConnections = true;
+				this.refresh;
+			};
+		}
+	}
+
+	closeConnections_ { |bool|
+		closeConnections = bool;
+		this.refresh;
+	}
+
+	triangulatePoints {
+		var triplets;
+		try {
+			triplets = SphericalDesign().points_(points).calcTriplets.triplets;
+		} {
+			"Couldn't calulate the triangulation of points :(".warn;
+			^nil
 		};
+
+		^triplets
 	}
 
 	// arrayOfIndices: triplets of indices of connected points
