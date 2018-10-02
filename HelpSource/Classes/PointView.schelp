@@ -55,18 +55,47 @@ to sequential indices code::[[0, 1, ... numPoints-1]]::. Directions are
 converted to link::Classes/Cartesian:: points internally.
 
 METHOD:: connections
+ARGUMENT:: indicesOrKey
 Set an link::Classes/Array:: of link::Classes/Array::s, each listing the indices of
-points which should be connected by lines. If
-code::update:: is code::true::, the connecting lines will immediately
-be shown. Connections can be toggled on and off with link::#-showConnections::.
-Default connections are set to sequential indices
-code::[[0, 1, ... numPoints-1]]::.
+points which should be connected by lines.
+
+Three keywords are also accepted:
+table::
+## code::\origin:: || connect all points to the origin
+## code::\sequential:: || connect all points in the order they were set
+## code::\triangulation:: || connect all points with a triangular mesh
+::
+
+If code::update:: is code::true::, the connecting lines will immediately be shown.
+
+ARGUMENT:: close
+a link::Classes/Boolean:: whether the end and start point of connection groups
+should be connected. This argument will set the instance state
+link::#-closeConnections:: and will default to this state if the argument is
+code::nil::.
+
+Connections can be toggled on and off with link::#-showConnections::.
+Default connections are code::\sequential::.
+
+METHOD:: closeConnections
+Set a link::Classes/Boolean:: whether the end and start point of connection groups
+should be connected.
+
+METHOD:: triangulatePoints
+Return an link::Classes/Array:: of triplets which are the indices of points
+forming the triangulation mesh across the points, similar to a convex hull.
+The results can be passed to link::#-connectTriplets:: to display the
+triangulations. Returns code::nil:: if the triangulations can't be calculated.
 
 METHOD:: connectTriplets
 Set an link::Classes/Array:: of link::Classes/Array::s, each listing the indices of
-points in groups of three that form a triangular mesh across the points. This
+points in groups of three that form a triangulation mesh across the points. This
 method is more efficient than setting connections to be the triplets directly,
 because it avoids repeated connections.
+NOTE::
+For convenience, if you're connecting all points via triangulation, use
+code::this.connections_('triangulation'):: instead.
+::
 
 METHOD:: numPoints
 Get the number of points displayed.
@@ -346,25 +375,19 @@ var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
 // remove the highlight
 ~pv.removeHighlight;
 
-// connect points with lines
+// connect pairs of points with lines
 ~pv.connections_((0 .. ~pv.points.size-1).clump(2))
 
-(
-// ...or connect points that form a triangular mesh.
-// This method is more efficient than setting
-// connections to be the triplets directly, because
-// some connections will be repeated
-~pv.connectTriplets_([
-	[ 0, 1, 2 ], [ 0, 1, 4 ], [ 0, 2, 3 ],
-	[ 0, 3, 4 ], [ 1, 2, 8 ], [ 1, 4, 6 ],
-	[ 1, 5, 6 ], [ 1, 5, 8 ], [ 2, 3, 7 ],
-	[ 2, 7, 8 ], [ 3, 4, 6 ], [ 3, 6, 7 ],
-	[ 5, 6, 10 ], [ 5, 8, 12 ], [ 5, 9, 10 ],
-	[ 5, 9, 12 ], [ 6, 7, 11 ], [ 6, 10, 11 ],
-	[ 7, 8, 12 ], [ 7, 11, 12 ], [ 9, 10, 11 ],
-	[ 9, 11, 12 ]
-])
-)
+// ...or connect points in a triangular mesh
+~pv.connections_(\triangulation)
+// sequentially
+~pv.connections_(\sequential)
+// to the origin
+~pv.connections_(\origin)
+// use the 'close' argument to connect end/start points of groups
+~pv.connections_([[1,2,3,4], [5,6,7,8]], close: true)
+~pv.connections_([[1,2,3,4], [5,6,7,8]], close: false)
+~pv.closeConnections = true; // or set the instance var independently
 
 // set random point colors
 ~pv.pointColors_(~pv.points.size.collect{ Color.rand })
@@ -381,7 +404,7 @@ var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
 // reset the point size to uniform scaling
 ~pv.pointSizeScales = nil
 
-// rotate the perspective
+// rotate the perspective (not the points themselves)
 ~pv.rotate_(25.degrad)
 ~pv.tumble_(45.degrad)
 ~pv.reset
@@ -394,7 +417,6 @@ var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
 ~pv.showConnections = false;
 
 // more options can be explored in the GUI!
-
 ::
 
 PRIVATE:: perspectiveView, drawFunc, makePerspectiveView, baseTilt, baseRotation, baseTumble, cen, rotatePhase, rotationView, cycTilt, cycRotate, cycTumble, oscTilt, oscRotate, oscTumble, prUpdateColors, randomizedAxes, prCheckAnimate, showView, initInteractions, makeShowView, rotatePhase, tiltPhase, tumblePhase, minDim, update, updateCanvasDims, layItOut, rotateStep, init, reduceTriplets
