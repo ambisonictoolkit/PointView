@@ -68,6 +68,9 @@ points in groups of three that form a triangular mesh across the points. This
 method is more efficient than setting connections to be the triplets directly,
 because it avoids repeated connections.
 
+METHOD:: numPoints
+Get the number of points displayed.
+
 
 SUBSECTION::Movement: rotation
 
@@ -219,6 +222,14 @@ METHOD:: pointSize
 The diameter of the points, in pixels. If link::#-renderDistanceSize:: is
 code::true::, the nearest point will be the specified size;
 
+METHOD:: pointSizeScales
+ARGUMENT:: normArray
+Scale each point by values in code::normArray::.
+link::Classes/SequenceableCollection#-clipExtend#-clipExtend:: is used to ensure
+code::normArray.size == this.numPoints::. Setting code::normArray:: to
+code::nil:: resets the points to the default uniform size.
+
+
 METHOD:: highlightPoints
 Provide emphasis on specific points in the view through color.
 
@@ -364,6 +375,11 @@ var highPnts = ~pv.points.selectIndices{ |pnt| pnt.z > 0 };
 ~pv.colorGroups_([(0..4),(5..8),(9..12)])
 // need to set the group colors...
 ~pv.groupColors_([Color.red, Color.green, Color.yellow])
+
+// scale the size of the points individually
+~pv.pointSizeScales = Array.series(~pv.numPoints, 0.1, 0.25)
+// reset the point size to uniform scaling
+~pv.pointSizeScales = nil
 
 // rotate the perspective
 ~pv.rotate_(25.degrad)
