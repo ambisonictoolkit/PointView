@@ -19,6 +19,7 @@ PointView : View {
 	var colsByHue = true, huesScrambled = false;  // if the colors have been set by hue range
 	var <pointSize = 15, <pointDistScale = 0.333;
 	var renderDistanceSize = true;
+	var <pointSizeScales;          // scalars for the size of each point
 	var prevColors, highlighted = false;
 	var connectionColor, indicesColor;
 	var connStrokeWidthNear = 3, connStrokeWidthFar;
@@ -728,7 +729,7 @@ PointView : View {
 			// 	var pntSize, f, fCol;
 			//
 			// 	if (renderDistanceSize) {
-			// 		pntSize = pnt_depths[i].linlin(-1.0,1.0, pointSize, pointSize * pointDistScale);
+			// 		pntSize = pnt_depths[i].linlin(-1.0,1.0, pointSize, minPntSize);
 			// 		fCol = indicesColor;
 			// 	} {
 			// 		pntSize = pointSize;
@@ -765,8 +766,9 @@ PointView : View {
 			// };
 
 
-			// NOTE: this seems to bring about dropouts on the points and
-			// index labels at high point counts, not sure why... so leaving original method above
+			// NOTE: this seems to bring about dropouts on the points
+			// and index labels at high point counts, not sure why
+			// ... so leaving original method above.
 			// iterate over indices in order of farthest to nearest depth
 			pnt_depths.order({ |a, b| a > b }).do{ |sortIdx, i|
 				var pnt, pntSize, f, fCol;
@@ -774,10 +776,14 @@ PointView : View {
 				pnt = pnts_xf[sortIdx];
 
 				if (renderDistanceSize) {
-					pntSize = pnt_depths[sortIdx].linlin(-1.0,1.0, pointSize, pointSize * pointDistScale);
+					pntSize = pnt_depths[sortIdx].linlin(-1.0,1.0, pointSize, minPntSize);
 					fCol = indicesColor;
 				} {
 					pntSize = pointSize;
+				};
+
+				pointSizeScales !? {
+					pntSize = pntSize * pointSizeScales[sortIdx]
 				};
 
 				// draw index
@@ -858,6 +864,13 @@ PointView : View {
 		pointSize = px;
 		this.refresh;
 		this.changed(\pointSize, px);
+	}
+
+	// scale each point by a corresponding value in normArray
+	pointSizeScales_ { |normArray|
+		pointSizeScales = normArray !? { normArray.clipExtend(this.numPoints) };
+		this.refresh;
+		this.changed(\pointSizeScales);
 	}
 
 	pointDistScale_ { |norm = 0.333|
@@ -1356,6 +1369,8 @@ PointView : View {
 
 		^retPairs
 	}
+
+	numPoints { ^this.points.size }
 
 	update { |who, what ... args|
 
