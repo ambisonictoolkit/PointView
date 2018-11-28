@@ -551,7 +551,7 @@ PointView : View {
 			var pntOrderByDepth;
 
 			minPntSize = pointSize * pointDistScale;
-			scale = minDim.half;
+			scale = if (ortho) { minDim.half * 0.92 } { minDim.half };
 
 			rotPnts = { |carts|
 				var rotated;
@@ -1406,6 +1406,13 @@ PointView : View {
 	}
 
 	connectionStrokeWidth { ^connStrokeWidthNear }
+
+	axisStrokeWidth_ { |px|
+		axisStrokeWidthNear = px;
+		axisStrokeWidthFar = axisStrokeWidthNear * pointDistScale;
+		this.refresh;
+	}
+
 
 	indicesColor_ { |aColor|
 		indicesColor = aColor;
