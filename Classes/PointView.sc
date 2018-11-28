@@ -548,6 +548,7 @@ PointView : View {
 			var axPnts, axPnts_xf, axPnts_depths;
 			var rotPnts, to2D, incStep, rho, offset;
 			var strRect, minPntSize, variance;
+			var pntOrderByDepth;
 
 			minPntSize = pointSize * pointDistScale;
 			scale = minDim.half;
@@ -660,7 +661,7 @@ PointView : View {
 			// draw axes
 			if (showAxes) {
 				var lineDpth, pntDepth, pntSize;
-				var r, oxy, theta, axStrings, refPnt;
+				var r, oxy, theta, axStrings, refPnt, axOrderByDepth;
 
 				strRect = "XX".bounds.asRect;
 				r = strRect.width / 2;
@@ -679,61 +680,96 @@ PointView : View {
 					axStrings = xyz;
 				};
 
-				// axPnts_xf = [origin,x,y,z]
-				axPnts_xf[1..].do{ |axPnt, i|
-					pntDepth = axPnts_depths[i+1];
+				Pen.capStyle_(1);
+
+				// axPnts_xf: [origin,x,y,z], depth first line rendering
+				axOrderByDepth = axPnts_depths[1..].order({ |a, b| a > b });
+				axOrderByDepth.do{ |ordIdx, i|
+					var axPnt = axPnts_xf[ordIdx+1];
+					pntDepth = axPnts_depths[ordIdx+1];
 
 					// average the depth between pairs of connected points
 					lineDpth = axPnts_depths[0] + pntDepth * 0.5;
 					pntSize = pntDepth.linlin(-1.0,1.0, 15, 5);
 
-					Pen.strokeColor_(axisColors[i]);
+					Pen.strokeColor_(axisColors[ordIdx]);
 					Pen.moveTo(axPnts_xf[0]);
 					Pen.width_(lineDpth.linlin(-0.6,0.6, axisStrokeWidthNear, axisStrokeWidthFar));
 					Pen.lineTo(axPnt);
 					Pen.stroke;
 
 					// draw axis label
-					refPnt = axPnts[i+1];
+					refPnt = axPnts[ordIdx+1];
 					rho = refPnt.rho + (pntSize * if (ortho, { 2 }, { 1.2 }));
 					offset = refPnt.asPolar.rho_(rho).asPoint - refPnt;
 					strRect = strRect.center_(axPnt + offset);
 
-					Pen.fillColor_(axisColors[i]);
-
 					Pen.stringCenteredIn(
-						axStrings[i],
+						axStrings[ordIdx],
 						strRect,
 						Font.default.pointSize_(
 							pntDepth.linlin(-1.0,1.0, 18, 10) // change font size with depth
-						)
+						),
+						axisColors[ordIdx]
 					);
 
 				};
 			};
 
-			// draw connecting lines
+			// for connections and points
+			pntOrderByDepth = pnt_depths.order({ |a, b| a > b });
+
+			// draw connecting lines, depth first
 			if (showConnections and: { connections.notNil }) {
-				var pDpths;
+				var pDpths, dpthOrder, pDpthsWithOrigin, amin, bmin, depthsBySet;
+				var err = false;
 
-				if (connections == \origin) { // connect all points to the origin
-					pDpths = this.numPoints.collect(pnt_depths[_] * 0.5); // split depth between point an origin
+				Pen.capStyle_(1); // rounded cap
+				Pen.joinStyle_(1);
 
-					pDpths.do{ |depth, idx|
+				if (connections == \origin) {   // connect all points to the origin
+					pDpths = pnt_depths * 0.5;  // split depth between point an origin
+					pDpthsWithOrigin = [0.dup(pDpths.size), pDpths].lace(pDpths.size*2).clump(2);
+
+					// NOTE: because of SCBUG #4179, need to catch errors
+					dpthOrder = pDpthsWithOrigin.order{ |a, b|
+						var amin, bmin;
+						try { amin = a.minItem } { amin = 0; err = true; };
+						try { bmin = b.minItem } { bmin = 0; err = true; };
+						amin >= bmin  // Not perfect depth sorting, but close
+					};
+					// if sorting errored...
+					if (err) { dpthOrder = (0 .. pDpths.lastIndex) };
+
+					dpthOrder.do{ |idx|
+						var depth = pDpths[idx];
+						Pen.strokeColor_(prConnectionColors.wrapAt(idx));
 						// change line width with depth
-						idx.postln;
-						prConnStrokeWidthsNear[idx].postln;
-						Pen.strokeColor_(prConnectionColors[idx]);
-						Pen.width_(depth.lincurve(-0.5, 0.5, prConnStrokeWidthsNear[idx], prConnStrokeWidthsFar[idx], -3.5));
+						Pen.width_(depth.lincurve(-0.5, 0.5, prConnStrokeWidthsNear.wrapAt(idx), prConnStrokeWidthsFar.wrapAt(idx), -3.5));
 						Pen.moveTo(axPnts_xf[0]); // origin: first point in axis points array
 						Pen.lineTo(pnts_xf[idx]);
+
 						Pen.stroke;
 					}
 				} {
-					connections.do{ |set, i|
-						var conns;
-						// collect and average the depth between pairs of connected points
-						pDpths = set.collect(pnt_depths[_]);
+					depthsBySet = connections.collect{ |set, i|
+						set.collect(pnt_depths[_]);
+					};
+
+					dpthOrder = depthsBySet.order{ |a, b|
+						var amin, bmin;
+						// NOTE: because of SCBUG #4179, need to catch errors
+						try { amin = a.minItem } { amin = 0; err = true; };
+						try { bmin = b.minItem } { bmin = 0; err = true; };
+						// amin >= bmin and: { amax >= bmax }
+						amin >= bmin  // Not perfect depth sorting, but close
+					};
+					if (err) { dpthOrder = (0 .. depthsBySet.lastIndex) };
+
+					dpthOrder.do{ |sortIdx, i|
+						var set, conns;
+						set = connections[sortIdx];
+						pDpths = depthsBySet[sortIdx];
 						pDpths = pDpths + pDpths.rotate(-1) / 2;
 
 						Pen.moveTo(pnts_xf.at(set[0]));
@@ -746,15 +782,20 @@ PointView : View {
 
 						conns.do{ |idx, j|
 							// change line width with depth
-							Pen.strokeColor_(prConnectionColors[i]);
-							Pen.width_(pDpths[j].lincurve(-0.8,0.8, prConnStrokeWidthsNear[i], prConnStrokeWidthsFar[i], -3.5));
+							Pen.strokeColor_(prConnectionColors.wrapAt(sortIdx));
+							Pen.width_(
+								pDpths[j].lincurve( -0.8, 0.8,
+									prConnStrokeWidthsNear.wrapAt(sortIdx),
+									prConnStrokeWidthsFar.wrapAt(sortIdx),
+									-3.5
+								)
+							);
 							Pen.lineTo(pnts_xf[idx]);
 							Pen.stroke;
 							Pen.moveTo(pnts_xf[idx]);
 						};
 					};
 				};
-
 			};
 
 			// draw points and indices
@@ -806,7 +847,7 @@ PointView : View {
 			// and index labels at high point counts, not sure why
 			// ... so leaving original method above.
 			// iterate over indices in order of farthest to nearest depth
-			pnt_depths.order({ |a, b| a > b }).do{ |sortIdx, i|
+			pntOrderByDepth.do{ |sortIdx, i|
 				var pnt, pntSize, f, fCol;
 
 				pnt = pnts_xf[sortIdx];
@@ -1184,7 +1225,6 @@ PointView : View {
 		conn !? {
 			connections = conn;
 			close !? { closeConnections = close };
-			"connections: ".post; connections.postln;
 			this.connectionStrokeWidth_(this.connectionStrokeWidth, refresh: false);
 			this.connectionColor_(connectionColor);
 			if (update) {
@@ -1341,77 +1381,25 @@ PointView : View {
 		if (highlighted) { this.pointColors_(prevColors) }
 	}
 
+
 	connectionColor_ { |colorOrArray, refresh = true|
-		var connSize;
-		"conn color connections: ".post; connections.postln;
-		connSize = if (connections.isKindOf(Array)) {
-			connections.size
-		} {
-			if (connections == \origin) {
-				this.numPoints
-			} {
-				1 // connections == nil
-			}
-		};
-
-		// SCBUG!! #4178
-		// connSize = switch (connections,
-		// 	nil, { 1 },
-		// 	\origin, { this.numPoints },
-		// 	{ "conn size! ".post; connections.size.postln; }
-		// );
-
 		connectionColor = colorOrArray;
-
-		if (colorOrArray.isKindOf(Color)) {
-			// connectionColor is a Color
-			prConnectionColors = colorOrArray.dup(connSize);
-		} {
-			// connectionColor is an Array
-			if (colorOrArray.size != connSize) {
-				warn(
-					format(
-						"[PointView:-connectionColor_] Connection color array size [%] "
-						"doens't match the number of connections [%] — %ing the array.",
-						colorOrArray.size, connSize, if (colorOrArray.size > connSize) { "clipp" } { "extend" }
-					)
-				)
-			};
-			prConnectionColors = colorOrArray.clipExtend(connSize);
-		};
-		"num conns: ".post; connSize.postln;
-		"prConnectionColors: ".post; prConnectionColors.postln;
-
+		prConnectionColors = if (colorOrArray.isKindOf(Array)) { colorOrArray } { [colorOrArray] };
 		refresh.if{ this.refresh };
 	}
 
 	connectionStrokeWidth_ { |numOrArray, refresh = true|
-		var connSize = switch (connections,
-			nil, { 1 },
-			\origin, { this.numPoints },
-			{ connections.size }
-		);
 
 		if (numOrArray.isKindOf(Number)) {
 			// strokeWidth is a Number
-			prConnStrokeWidthsNear = numOrArray.dup(connSize);
-			prConnStrokeWidthsFar = (numOrArray * pointDistScale).dup(connSize);
+			prConnStrokeWidthsNear = [numOrArray];
+			prConnStrokeWidthsFar = [numOrArray * pointDistScale];
 			connStrokeWidthNear = numOrArray;
 		} {
 			// strokeWidth is an Array
-			if (numOrArray.size != connSize) {
-				warn(
-					format(
-						"[PointView:-connectionStrokeWidth_] Stroke width array size [%] "
-						"doens't match the number of connections [%] — %ing the array.",
-						numOrArray.size, connSize, if (numOrArray.size > connSize) { "clipp" } { "extend" }
-					)
-				)
-			};
-			prConnStrokeWidthsNear = numOrArray.clipExtend(connSize);
-			prConnStrokeWidthsFar = (numOrArray * pointDistScale).clipExtend(connSize);
+			prConnStrokeWidthsNear = numOrArray;
+			prConnStrokeWidthsFar = numOrArray * pointDistScale;
 			connStrokeWidthNear = prConnStrokeWidthsNear;
-			"prConnStrokeWidthsNear: ".post; prConnStrokeWidthsNear.postln;
 		};
 
 		refresh.if{ this.refresh };
