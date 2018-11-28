@@ -22,8 +22,10 @@ PointView : View {
 	var renderDistanceSize = true;
 	var <pointSizeScales;          // scalars for the size of each point
 	var prevColors, highlighted = false;
-	var connectionColor, indicesColor;
-	var connStrokeWidthNear = 4, connStrokeWidthFar;
+	var <connectionColor, indicesColor, prConnectionColors;
+	var axisStrokeWidthNear = 3, axisStrokeWidthFar;
+	var connStrokeWidthNear = 4;
+	var prConnStrokeWidthsNear, prConnStrokeWidthsFar;
 	var <groupColors, <colorGroups, defaultGroupColor;
 	var connChk;
 
@@ -48,7 +50,7 @@ PointView : View {
 	var rotPxStep = 1;
 
 	// views
-	// TODO: showView, perspectiveView should follow MVC design like rotationsView
+	// TODO: showView, perspectiveView should follow MVC design like rotationView
 	var <userView, <rotationView, <showView, <perspectiveView;
 
 	// other
@@ -59,7 +61,7 @@ PointView : View {
 		^super.new(parent, bounds).init;
 	}
 
-	init { |argSpec, initVal|
+	init {
 		var initOscWidth = 8.degrad;
 
 		points = [];
@@ -78,10 +80,11 @@ PointView : View {
 		rotateMode = \rtt;
 		randomVariance = 0.15;
 		connectionColor = Color.blue.alpha_(0.1);
+		prConnectionColors = [connectionColor];
 		indicesColor = Color.black;
 		groupColors = [Color.red];
 		defaultGroupColor = Color.gray.alpha_(0.3);
-		connStrokeWidthFar = connStrokeWidthNear * pointDistScale;
+		axisStrokeWidthFar = axisStrokeWidthNear * pointDistScale;
 
 		sdClass = \SphericalDesign.asClass; // support for SphericalDesign without explicit dependency
 
@@ -129,6 +132,8 @@ PointView : View {
 		this.makePerspectiveView;
 
 		this.layItOut;
+		this.connectionStrokeWidth_(connStrokeWidthNear, refresh: false);
+		this.connectionColor_(connectionColor);
 	}
 
 	layItOut {
@@ -500,7 +505,9 @@ PointView : View {
 		rhoScale = sphericals.collect(_.rho).maxItem.reciprocal;
 		pointsNorm = sphericals.collect({ |me| me.rho_(me.rho * rhoScale).asCartesian });
 
-		if (resetConnections) { connections = [(0..points.size-1)] };
+		if (resetConnections) {
+			this.connections_((0..points.size-1), close: false, update: false);
+		};
 		this.prUpdateColors;
 		this.refresh;
 	}
@@ -541,9 +548,10 @@ PointView : View {
 			var axPnts, axPnts_xf, axPnts_depths;
 			var rotPnts, to2D, incStep, rho, offset;
 			var strRect, minPntSize, variance;
+			var pntOrderByDepth;
 
 			minPntSize = pointSize * pointDistScale;
-			scale = minDim.half;
+			scale = if (ortho) { minDim.half * 0.92 } { minDim.half };
 
 			rotPnts = { |carts|
 				var rotated;
@@ -653,7 +661,7 @@ PointView : View {
 			// draw axes
 			if (showAxes) {
 				var lineDpth, pntDepth, pntSize;
-				var r, oxy, theta, axStrings, refPnt;
+				var r, oxy, theta, axStrings, refPnt, axOrderByDepth;
 
 				strRect = "XX".bounds.asRect;
 				r = strRect.width / 2;
@@ -672,60 +680,96 @@ PointView : View {
 					axStrings = xyz;
 				};
 
-				// axPnts_xf = [origin,x,y,z]
-				axPnts_xf[1..].do{ |axPnt, i|
-					pntDepth = axPnts_depths[i+1];
+				Pen.capStyle_(1);
+
+				// axPnts_xf: [origin,x,y,z], depth first line rendering
+				axOrderByDepth = axPnts_depths[1..].order({ |a, b| a > b });
+				axOrderByDepth.do{ |ordIdx, i|
+					var axPnt = axPnts_xf[ordIdx+1];
+					pntDepth = axPnts_depths[ordIdx+1];
 
 					// average the depth between pairs of connected points
 					lineDpth = axPnts_depths[0] + pntDepth * 0.5;
 					pntSize = pntDepth.linlin(-1.0,1.0, 15, 5);
 
-					Pen.strokeColor_(axisColors[i]);
+					Pen.strokeColor_(axisColors[ordIdx]);
 					Pen.moveTo(axPnts_xf[0]);
-					Pen.width_(lineDpth.linlin(-0.6,0.6, connStrokeWidthNear, connStrokeWidthFar));
+					Pen.width_(lineDpth.linlin(-0.6,0.6, axisStrokeWidthNear, axisStrokeWidthFar));
 					Pen.lineTo(axPnt);
 					Pen.stroke;
 
 					// draw axis label
-					refPnt = axPnts[i+1];
+					refPnt = axPnts[ordIdx+1];
 					rho = refPnt.rho + (pntSize * if (ortho, { 2 }, { 1.2 }));
 					offset = refPnt.asPolar.rho_(rho).asPoint - refPnt;
 					strRect = strRect.center_(axPnt + offset);
 
-					Pen.fillColor_(axisColors[i]);
-
 					Pen.stringCenteredIn(
-						axStrings[i],
+						axStrings[ordIdx],
 						strRect,
 						Font.default.pointSize_(
 							pntDepth.linlin(-1.0,1.0, 18, 10) // change font size with depth
-						)
+						),
+						axisColors[ordIdx]
 					);
 
 				};
 			};
 
-			// draw connecting lines
+			// for connections and points
+			pntOrderByDepth = pnt_depths.order({ |a, b| a > b });
+
+			// draw connecting lines, depth first
 			if (showConnections and: { connections.notNil }) {
-				var pDpths;
+				var pDpths, dpthOrder, pDpthsWithOrigin, amin, bmin, depthsBySet;
+				var err = false;
 
-				Pen.strokeColor_(connectionColor);
+				Pen.capStyle_(1); // rounded cap
+				Pen.joinStyle_(1);
 
-				if (connections == \origin) { // connect all points to the origin
-					pDpths = this.numPoints.collect(pnt_depths[_] * 0.5); // split depth between point an origin
+				if (connections == \origin) {   // connect all points to the origin
+					pDpths = pnt_depths * 0.5;  // split depth between point an origin
+					pDpthsWithOrigin = [0.dup(pDpths.size), pDpths].lace(pDpths.size*2).clump(2);
 
-					pDpths.do{ |depth, idx|
+					// NOTE: because of SCBUG #4179, need to catch errors
+					dpthOrder = pDpthsWithOrigin.order{ |a, b|
+						var amin, bmin;
+						try { amin = a.minItem } { amin = 0; err = true; };
+						try { bmin = b.minItem } { bmin = 0; err = true; };
+						amin >= bmin  // Not perfect depth sorting, but close
+					};
+					// if sorting errored...
+					if (err) { dpthOrder = (0 .. pDpths.lastIndex) };
+
+					dpthOrder.do{ |idx|
+						var depth = pDpths[idx];
+						Pen.strokeColor_(prConnectionColors.wrapAt(idx));
 						// change line width with depth
-						Pen.width_(depth.lincurve(-0.5, 0.5, connStrokeWidthNear, connStrokeWidthFar, -3.5));
-						Pen.moveTo(axPnts_xf[0]);
+						Pen.width_(depth.lincurve(-0.5, 0.5, prConnStrokeWidthsNear.wrapAt(idx), prConnStrokeWidthsFar.wrapAt(idx), -3.5));
+						Pen.moveTo(axPnts_xf[0]); // origin: first point in axis points array
 						Pen.lineTo(pnts_xf[idx]);
+
 						Pen.stroke;
 					}
 				} {
-					connections.do{ |set, i|
-						var conns;
-						// collect and average the depth between pairs of connected points
-						pDpths = set.collect(pnt_depths[_]);
+					depthsBySet = connections.collect{ |set, i|
+						set.collect(pnt_depths[_]);
+					};
+
+					dpthOrder = depthsBySet.order{ |a, b|
+						var amin, bmin;
+						// NOTE: because of SCBUG #4179, need to catch errors
+						try { amin = a.minItem } { amin = 0; err = true; };
+						try { bmin = b.minItem } { bmin = 0; err = true; };
+						// amin >= bmin and: { amax >= bmax }
+						amin >= bmin  // Not perfect depth sorting, but close
+					};
+					if (err) { dpthOrder = (0 .. depthsBySet.lastIndex) };
+
+					dpthOrder.do{ |sortIdx, i|
+						var set, conns;
+						set = connections[sortIdx];
+						pDpths = depthsBySet[sortIdx];
 						pDpths = pDpths + pDpths.rotate(-1) / 2;
 
 						Pen.moveTo(pnts_xf.at(set[0]));
@@ -738,14 +782,20 @@ PointView : View {
 
 						conns.do{ |idx, j|
 							// change line width with depth
-							Pen.width_(pDpths[j].lincurve(-0.8,0.8, connStrokeWidthNear, connStrokeWidthFar, -3.5));
+							Pen.strokeColor_(prConnectionColors.wrapAt(sortIdx));
+							Pen.width_(
+								pDpths[j].lincurve( -0.8, 0.8,
+									prConnStrokeWidthsNear.wrapAt(sortIdx),
+									prConnStrokeWidthsFar.wrapAt(sortIdx),
+									-3.5
+								)
+							);
 							Pen.lineTo(pnts_xf[idx]);
 							Pen.stroke;
 							Pen.moveTo(pnts_xf[idx]);
 						};
 					};
 				};
-
 			};
 
 			// draw points and indices
@@ -797,7 +847,7 @@ PointView : View {
 			// and index labels at high point counts, not sure why
 			// ... so leaving original method above.
 			// iterate over indices in order of farthest to nearest depth
-			pnt_depths.order({ |a, b| a > b }).do{ |sortIdx, i|
+			pntOrderByDepth.do{ |sortIdx, i|
 				var pnt, pntSize, f, fCol;
 
 				pnt = pnts_xf[sortIdx];
@@ -902,6 +952,7 @@ PointView : View {
 
 	pointDistScale_ { |norm = 0.333|
 		pointDistScale = norm;
+		this.connectionStrokeWidth_(this.connectionStrokeWidth);
 		this.refresh;
 		this.changed(\pointDistScale, norm);
 	}
@@ -1151,7 +1202,7 @@ PointView : View {
 		{ indicesOrKey.isKindOf(Symbol) } {
 			switch(indicesOrKey,
 				\origin, {
-					conn = \origin
+					conn = \origin;
 				},
 				\sequential, {
 					conn = [(0..this.numPoints-1)];
@@ -1165,15 +1216,17 @@ PointView : View {
 		}
 		{ indicesOrKey.isKindOf(Array) } {
 			if (indicesOrKey.rank != 2) {
-				"[PointView:-connections_] indicesOrKey argument "
-				"is not an array with rank == 2.".throw
-			};
-			conn = indicesOrKey;
+				conn = [indicesOrKey];
+			} {
+				conn = indicesOrKey;
+			}
 		};
 
 		conn !? {
 			connections = conn;
 			close !? { closeConnections = close };
+			this.connectionStrokeWidth_(this.connectionStrokeWidth, refresh: false);
+			this.connectionColor_(connectionColor);
 			if (update) {
 				this.showConnections_(true); // refresh
 			};
@@ -1328,18 +1381,38 @@ PointView : View {
 		if (highlighted) { this.pointColors_(prevColors) }
 	}
 
-	connectionColor_ { |aColor|
-		connectionColor = aColor;
-		this.refresh;
+
+	connectionColor_ { |colorOrArray, refresh = true|
+		connectionColor = colorOrArray;
+		prConnectionColors = if (colorOrArray.isKindOf(Array)) { colorOrArray } { [colorOrArray] };
+		refresh.if{ this.refresh };
 	}
 
-	connectionStrokeWidth_ { |px|
-		connStrokeWidthNear = px;
-		connStrokeWidthFar = px * pointDistScale;
-		this.refresh;
+	connectionStrokeWidth_ { |numOrArray, refresh = true|
+
+		if (numOrArray.isKindOf(Number)) {
+			// strokeWidth is a Number
+			prConnStrokeWidthsNear = [numOrArray];
+			prConnStrokeWidthsFar = [numOrArray * pointDistScale];
+			connStrokeWidthNear = numOrArray;
+		} {
+			// strokeWidth is an Array
+			prConnStrokeWidthsNear = numOrArray;
+			prConnStrokeWidthsFar = numOrArray * pointDistScale;
+			connStrokeWidthNear = prConnStrokeWidthsNear;
+		};
+
+		refresh.if{ this.refresh };
 	}
 
 	connectionStrokeWidth { ^connStrokeWidthNear }
+
+	axisStrokeWidth_ { |px|
+		axisStrokeWidthNear = px;
+		axisStrokeWidthFar = axisStrokeWidthNear * pointDistScale;
+		this.refresh;
+	}
+
 
 	indicesColor_ { |aColor|
 		indicesColor = aColor;
@@ -1421,13 +1494,12 @@ PointView : View {
 			3.collect({ |i|
 				[wrapped[i], wrapped[i+1]]
 			}).do{ |pair|
-				// if (pairsDone.includes(pair).not) {
 				if (
 					pairsDone.any({ |pdone|
 						{ |me| me[0] == pair[0] and: { me[1] == pair[1] } }.matchItem(pdone)
 					}).not
 				) {
-					retPairs = retPairs.add(pair);         // add pair to connection list
+					retPairs = retPairs.add(pair);           // add pair to connection list
 					pairsDone = pairsDone.add(pair);         // keep track of a duple that's been used
 					pairsDone = pairsDone.add(pair.reverse); // the reverse pair is identical
 				};

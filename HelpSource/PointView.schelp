@@ -55,6 +55,12 @@ to sequential indices code::[[0, 1, ... numPoints-1]]::. Directions are
 converted to link::Classes/Cartesian:: points internally.
 
 METHOD:: connections
+Set/get the list of indices which are connected by lines.
+Note:: If you've set this value by keyword, getting this value will return the
+actual link::Classes/Array:: of connected indices, with the exception of
+code::\origin:: which returns this keyword (because the origin is technically
+not a point and therefore doens't have an index).::
+
 ARGUMENT:: indicesOrKey
 Set an link::Classes/Array:: of link::Classes/Array::s, each listing the indices of
 points which should be connected by lines.
@@ -221,15 +227,27 @@ A link::Classes/Boolean:: toggling the connection lines on and off.
 link::#-connections:: must be set.
 
 METHOD:: connectionColor
-The link::Classes/Color:: of the lines showing the link::#-connections::.
+Set/Get the color(s) of the lines showing the link::#-connections::. This can be
+a link::Classes/Color:: or an link::Classes/Array:: of link::Classes/Color::s,
+one for each connection (i.e. the array size should equal
+code::connections.size::, if smaller the connection colors will wrap through
+the provided array).
 
 METHOD:: connectionStrokeWidth
-The stroke width of connection lines in pixels. The farthest connection line
-widths will be scaled by link::#-pointDistScale::.
+Get/set the stroke width of connection lines in pixels.
+The size determins the stroke width of the line nearest to the viewer, the
+farthest connection line widths will be scaled by link::#-pointDistScale::.
+This can be a link::Classes/Number:: or an link::Classes/Array:: of
+link::Classes/Number::s, one for each connection (i.e. the array size should
+equal code::connections.size::, if smaller the connection stroke widths will
+wrap through the provided array).
 
 METHOD:: showAxes
 A link::Classes/Boolean:: flag stating whether the display the axes at the origin.
 The length of the axes can be set with link::#-axisScale::.
+
+METHOD:: axisStrokeWidth
+Set the stroke width of the axes at the origin, in pixels.
 
 METHOD:: axisColors
 A 3-element link::Classes/Array:: of link::Classes/Color::s in the order
