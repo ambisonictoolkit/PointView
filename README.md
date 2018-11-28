@@ -35,6 +35,18 @@ Known issues are logged at
 [GitHub](https://github.com/ambisonictoolkit/PointView/issues).
 
 
+Change log
+==========
+
+0.2.0
+- add ability to specify stroke width and color for each connection.
+- depth-first drawing of connections and axes to enchance 3D effect.
+- add axis stroke width setter method.
+- scale orthographic projection view down slightly to allow room for index text on outermost points.
+
+0.1.0
+- initial release.
+
 Credits
 =======
 
