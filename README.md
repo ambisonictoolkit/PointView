@@ -38,6 +38,9 @@ Known issues are logged at
 Change log
 ==========
 
+0.3.0
+- add export view to an image, optionally with or without controls shown.
+
 0.2.0
 - add ability to specify stroke width and color for each connection.
 - depth-first drawing of connections and axes to enchance 3D effect.
