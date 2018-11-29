@@ -107,6 +107,112 @@ METHOD:: numPoints
 Get the number of points displayed.
 
 
+SUBSECTION::View options
+
+METHOD:: pointColors
+code::arrayOfColors:: can be a single link::Classes/Color::,
+link::Classes/Array:: of link::Classes/Color::s. If
+code::(arrayOfColors.size != numPoints)::, points will wrap through the
+color array.
+
+METHOD:: pointHueRange
+Set the points to colors within a hue range. code::hueLow:: and code::hueHigh::
+are code::0 <= hue < 1::. Optionally specify saturation, value, and alpha, which
+are bound as in link::Classes/Color#*hsv::. If code::scramble:: is
+code::true::, the colors will be randomly distributed among the points instead
+of hues ascending with index.
+
+METHOD:: groupColors
+code::arrayOfColors:: can be a single link::Classes/Color::,
+link::Classes/Array:: of link::Classes/Color::s. If
+code::(colorGroups.size != groupColors.size)::, groups will wrap through the
+color array. Indices not listed in the link::#-colorGroups:: will be assigned
+the code::defaultColor::.
+
+METHOD:: colorGroups
+An link::Classes/Array:: of link::Classes/Array::s containing point indices
+to be set to each of the link::#-groupColors::. If
+code::(colorGroups.size != groupColors.size)::, groups will wrap through the
+link::#-groupColors:: array. Indices not listed in the
+link::#-colorGroups:: will be assigned the code::defaultColor::.
+
+METHOD:: showConnections
+A link::Classes/Boolean:: toggling the connection lines on and off.
+link::#-connections:: must be set.
+
+METHOD:: connectionColor
+Set/Get the color(s) of the lines showing the link::#-connections::. This can be
+a link::Classes/Color:: or an link::Classes/Array:: of link::Classes/Color::s,
+one for each connection (i.e. the array size should equal
+code::connections.size::, if smaller the connection colors will wrap through
+the provided array).
+
+METHOD:: connectionStrokeWidth
+Get/set the stroke width of connection lines in pixels.
+The size determins the stroke width of the line nearest to the viewer, the
+farthest connection line widths will be scaled by link::#-pointDistScale::.
+This can be a link::Classes/Number:: or an link::Classes/Array:: of
+link::Classes/Number::s, one for each connection (i.e. the array size should
+equal code::connections.size::, if smaller the connection stroke widths will
+wrap through the provided array).
+
+METHOD:: showAxes
+A link::Classes/Boolean:: flag stating whether the display the axes at the origin.
+The length of the axes can be set with link::#-axisScale::.
+
+METHOD:: axisStrokeWidth
+Set the stroke width of the axes at the origin, in pixels.
+
+METHOD:: axisColors
+A 3-element link::Classes/Array:: of link::Classes/Color::s in the order
+code::[x,y,z]::.
+
+METHOD:: axisScale
+Adjust the length of the axes. code::scale:: of code::1:: makes the axes as long
+as the distance to the outermost point. Show/hide the axes with
+link::#-showAxes::.
+
+METHOD:: showIndices
+A link::Classes/Boolean:: flag indicating whether to display the point indices
+or not.
+
+METHOD:: indicesColor
+Set the link::Classes/Color:: of the text of the points' indices.
+
+METHOD:: pointSize
+The diameter of the points, in pixels. If link::#-renderDistanceSize:: is
+code::true::, the nearest point will be the specified size;
+
+METHOD:: pointSizeScales
+ARGUMENT:: normArray
+Scale each point by values in code::normArray::.
+link::Classes/SequenceableCollection#-clipExtend#-clipExtend:: is used to ensure
+code::normArray.size == this.numPoints::. Setting code::normArray:: to
+code::nil:: resets the points to the default uniform size.
+
+METHOD:: highlightPoints
+Provide emphasis on specific points in the view through color.
+
+ARGUMENT:: arrayOfIndices
+An link::Classes/Array:: of indices of the points to render in
+code::highlightColor::.
+
+ARGUMENT:: highlightColor
+The link::Classes/Color:: for highlighted points. Default
+code::Color.red::.
+
+ARGUMENT:: defaultColor
+The link::Classes/Color:: for non-highlighted points. Default
+code::Color.gray.alpha_(0.25)::.
+
+METHOD:: removeHighlight
+Restore the points' colors to the state before they were set to
+link::#-highlightPoints::.
+
+METHOD:: units
+Set the units, code::'radians':: or code::'degrees'::, used by the GUI.
+
+
 SUBSECTION::Movement: rotation
 
 METHOD:: rotate
@@ -193,113 +299,6 @@ Set the framerate of the animation if the view is set to cycle
 (link::#-rotateCyc::) or oscillate (link::#-rotateOsc::).
 
 
-SUBSECTION::View options
-
-METHOD:: pointColors
-code::arrayOfColors:: can be a single link::Classes/Color::,
-link::Classes/Array:: of link::Classes/Color::s. If
-code::(arrayOfColors.size != numPoints)::, points will wrap through the
-color array.
-
-METHOD:: pointHueRange
-Set the points to colors within a hue range. code::hueLow:: and code::hueHigh::
-are code::0 <= hue < 1::. Optionally specify saturation, value, and alpha, which
-are bound as in link::Classes/Color#*hsv::. If code::scramble:: is
-code::true::, the colors will be randomly distributed among the points instead
-of hues ascending with index.
-
-METHOD:: groupColors
-code::arrayOfColors:: can be a single link::Classes/Color::,
-link::Classes/Array:: of link::Classes/Color::s. If
-code::(colorGroups.size != groupColors.size)::, groups will wrap through the
-color array. Indices not listed in the link::#-colorGroups:: will be assigned
-the code::defaultColor::.
-
-METHOD:: colorGroups
-An link::Classes/Array:: of link::Classes/Array::s containing point indices
-to be set to each of the link::#-groupColors::. If
-code::(colorGroups.size != groupColors.size)::, groups will wrap through the
-link::#-groupColors:: array. Indices not listed in the
-link::#-colorGroups:: will be assigned the code::defaultColor::.
-
-METHOD:: showConnections
-A link::Classes/Boolean:: toggling the connection lines on and off.
-link::#-connections:: must be set.
-
-METHOD:: connectionColor
-Set/Get the color(s) of the lines showing the link::#-connections::. This can be
-a link::Classes/Color:: or an link::Classes/Array:: of link::Classes/Color::s,
-one for each connection (i.e. the array size should equal
-code::connections.size::, if smaller the connection colors will wrap through
-the provided array).
-
-METHOD:: connectionStrokeWidth
-Get/set the stroke width of connection lines in pixels.
-The size determins the stroke width of the line nearest to the viewer, the
-farthest connection line widths will be scaled by link::#-pointDistScale::.
-This can be a link::Classes/Number:: or an link::Classes/Array:: of
-link::Classes/Number::s, one for each connection (i.e. the array size should
-equal code::connections.size::, if smaller the connection stroke widths will
-wrap through the provided array).
-
-METHOD:: showAxes
-A link::Classes/Boolean:: flag stating whether the display the axes at the origin.
-The length of the axes can be set with link::#-axisScale::.
-
-METHOD:: axisStrokeWidth
-Set the stroke width of the axes at the origin, in pixels.
-
-METHOD:: axisColors
-A 3-element link::Classes/Array:: of link::Classes/Color::s in the order
-code::[x,y,z]::.
-
-METHOD:: axisScale
-Adjust the length of the axes. code::scale:: of code::1:: makes the axes as long
-as the distance to the outermost point. Show/hide the axes with
-link::#-showAxes::.
-
-METHOD:: showIndices
-A link::Classes/Boolean:: flag indicating whether to display the point indices
-or not.
-
-METHOD:: indicesColor
-Set the link::Classes/Color:: of the text of the points' indices.
-
-METHOD:: pointSize
-The diameter of the points, in pixels. If link::#-renderDistanceSize:: is
-code::true::, the nearest point will be the specified size;
-
-METHOD:: pointSizeScales
-ARGUMENT:: normArray
-Scale each point by values in code::normArray::.
-link::Classes/SequenceableCollection#-clipExtend#-clipExtend:: is used to ensure
-code::normArray.size == this.numPoints::. Setting code::normArray:: to
-code::nil:: resets the points to the default uniform size.
-
-
-METHOD:: highlightPoints
-Provide emphasis on specific points in the view through color.
-
-ARGUMENT:: arrayOfIndices
-An link::Classes/Array:: of indices of the points to render in
-code::highlightColor::.
-
-ARGUMENT:: highlightColor
-The link::Classes/Color:: for highlighted points. Default
-code::Color.red::.
-
-ARGUMENT:: defaultColor
-The link::Classes/Color:: for non-highlighted points. Default
-code::Color.gray.alpha_(0.25)::.
-
-METHOD:: removeHighlight
-Restore the points' colors to the state before they were set to
-link::#-highlightPoints::.
-
-METHOD:: units
-Set the units, code::'radians':: or code::'degrees'::, used by the GUI.
-
-
 SUBSECTION::Perspective
 
 METHOD:: setOrtho
@@ -366,6 +365,40 @@ Returns the link::Classes/UserView:: which is used for drawing the point display
 METHOD:: pointsNorm
 Return the link::Classes/Array:: of link::Classes/Cartesian:: points used
 internally for plotting. i.e. normalized to a radius of 1.
+
+
+SUBSECTION:: Other
+
+METHOD:: export
+Export the view to an image file.
+
+ARGUMENT:: fileName
+A link::Classes/String:: that is the name of the file, including the extension.
+The extension isn't necessary, but you'll then need to specify the
+strong::format:: and the file will be written without an extension.
+
+ARGUMENT:: directory
+A link::Classes/String:: that is the directory into which the file will be
+written. Default is the user home directory, code::Platform.userHomeDir::.
+
+ARGUMENT:: format
+An optional link::Classes/String:: of the format to use.
+code::Image.formats:: lists supported formats.
+If code::nil::, the format will be inferred from the path extension (the
+default).
+
+ARGUMENT:: quality
+The quality factor in the range code::0::, small compressed files, to
+code::100::, large uncompressed files, or code::-1::, the default settings.
+Default is code::-1::.
+
+ARGUMENT:: hideControls
+A link::Classes/Boolean:: specifying whether the controls should be hidden when
+exporting the image, so only the visualization is written to file.
+
+ARGUMENT:: finishCond
+An optional link::Classes/Condition:: which will be set code::true:: and signal
+when the image has been written.
 
 
 EXAMPLES::

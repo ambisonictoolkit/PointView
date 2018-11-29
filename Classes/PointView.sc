@@ -308,24 +308,23 @@ PointView : View {
 			VLayout(
 				HLayout(
 					axChk,
-					StaticText().string_("Axes").align_(\left),
-					15,
+					StaticText().string_("Axes").align_(\left).minWidth_(90),
+					nil,
 					StaticText().string_("length: ").align_(\left),
-					axLenSl
+					axLenSl,
+					nil
 				),
 				HLayout(
 					indcChk,
-					StaticText().string_("Indices").align_(\left),
+					StaticText().string_("Indices").align_(\left).minWidth_(90),
 					nil
 				),
 				HLayout(
 					connChk,
-					StaticText().string_("Connections").align_(\left),
+					StaticText().string_("Connections").align_(\left).minWidth_(90),
 					nil,
 					triBut,
-					3,
 					seqBut,
-					3,
 					origBut
 				),
 				statusTxt,
@@ -1511,6 +1510,42 @@ PointView : View {
 	}
 
 	numPoints { ^this.points.size }
+
+	export { |fileName, directory = (Platform.userHomeDir), format, quality = -1, hideControls = true, finishCond|
+		var fnPn, dirPn, path, img, win;
+		var visibleState;
+
+		fnPn = PathName(fileName);
+		dirPn = PathName(directory);
+		if (File.exists(dirPn.fullPath).not) {
+			Error("Target directory doens't exist. No image saved.").errorString.postln;
+			^this
+		};
+
+		if (hideControls) {
+			visibleState = this.children.collect(_.visible);
+			this.children.do({ |elem|
+				if (elem.isKindOf(UserView).not) { elem.visible = false }
+			});
+		};
+
+		path = (dirPn +/+ fnPn).fullPath;
+		fork ({
+			postf("Writing the plot to: % ...", path);
+			img = Image.fromWindow(this, this.bounds.origin_(0@0));
+			win = img.plot(freeOnClose:true);
+			0.3.wait;
+			img.write(path, format, quality);
+			win.close;
+			if (hideControls) {
+				this.children.do({ |elem, i|
+					elem.visible = visibleState[i];
+				});
+			};
+			"done.".postln;
+			finishCond !? { finishCond.test_(true).signal };
+		}, AppClock);
+	}
 
 	update { |who, what ... args|
 
