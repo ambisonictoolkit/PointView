@@ -1421,6 +1421,7 @@ PointView : View {
 	// called when points are set
 	prUpdateColors {
 		var colsHSV, hues, sat, val, alpha;
+
 		if (colsByHue) {
 			colsHSV = prPntDrawCols.collect(_.asHSV); // [hue, saturation, value, alpha]
 			hues = colsHSV.collect(_.first);
@@ -1484,6 +1485,7 @@ PointView : View {
 	// drawn multiple times. returns array of index pairs
 	reduceTriplets { |tripletArray|
 		var pairsDone, retPairs, wrapped;
+
 		// reduce to point pairs to remove repeated lines
 		retPairs = [];
 		pairsDone = []; // list of pairs already found
