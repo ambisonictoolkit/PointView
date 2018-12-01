@@ -355,7 +355,7 @@ PointViewUI : View {
 		radianCtls = IdentityDictionary(know: true).putPairs([
 			\rotate, PointViewRadianCtl(
 				pv, "Rotate", \rotate_, \baseRotation,
-				[2pi, -2pi].asSpec, \radians, pv.axisColors[2]
+				[pi, -pi].asSpec, \radians, pv.axisColors[2]
 			),
 			\tilt, PointViewRadianCtl(
 				pv, "Tilt", \tilt_, \baseTilt,
@@ -363,7 +363,7 @@ PointViewUI : View {
 			),
 			\tumble, PointViewRadianCtl(
 				pv, "Tumble", \tumble_, \baseTumble,
-				[-pi/2, pi/2].asSpec, \radians, pv.axisColors[1]
+				[-pi, 1pi].asSpec, \radians, pv.axisColors[1]
 			)
 		]);
 	}
