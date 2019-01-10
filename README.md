@@ -1,5 +1,5 @@
-The PointView Quark : Read Me
-========================
+The PointView Quark
+===================
 _An interactive view displaying a collection of points in 3D space._
 
 Points are `Cartesian` points (optionally specified as directional pairs of

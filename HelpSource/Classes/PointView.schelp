@@ -78,13 +78,17 @@ table::
 If code::update:: is code::true::, the connecting lines will immediately be shown.
 
 ARGUMENT:: close
-a link::Classes/Boolean:: whether the end and start point of connection groups
+A link::Classes/Boolean:: whether the end and start point of connection groups
 should be connected. This argument will set the instance state
 link::#-closeConnections:: and will default to this state if the argument is
 code::nil::.
 
 Connections can be toggled on and off with link::#-showConnections::.
 Default connections are code::\sequential::.
+
+ARGUMENT:: update
+A link::Classes/Boolean:: whether to update the view with the new connections
+or not.
 
 METHOD:: closeConnections
 Set a link::Classes/Boolean:: whether the end and start point of connection groups
@@ -275,7 +279,7 @@ rotate cyclically around each axis or all axes.
 
 METHOD:: rotateCycPeriod
 METHOD:: tiltCycPeriod
-METHOD:: tumbleCyclePeriod
+METHOD:: tumbleCycPeriod
 METHOD:: allCycPeriod
 The cycle period of each axis or all axes, in seconds.
 
