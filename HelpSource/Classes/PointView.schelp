@@ -3,7 +3,10 @@ summary:: An interactive view displaying a collection of points in 3D space.
 categories:: GUI
 related:: Classes/Cartesian, Classes/SphericalDesign
 
+image::../img/PointView_interface.png#PointView displaying a 15-point t-design::
+
 DESCRIPTION::
+
 An interactive view displaying a collection of points in 3D space. Points are
 link::Classes/Cartesian:: points (optionally specified as directional pairs of
 code::[azimuth, elevation]::) rendered with adjustable 3D perspective or orthogonal
