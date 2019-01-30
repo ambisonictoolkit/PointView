@@ -52,7 +52,7 @@ PointView : View {
 	// views
 	// TODO: showView, perspectiveView should follow MVC design like rotationView
 	var <userView, <rotationView, <showView, <perspectiveView;
-
+	var <pixelLocations;
 	// other
 	var sdClass;
 
@@ -650,6 +650,9 @@ PointView : View {
 
 			// transform 3D positions to 2D points with perspective
 			pnts_xf = to2D.(pnts);
+			pixelLocations = pnts_xf.collect{arg p;
+				p + cen
+			};
 			axPnts_xf = to2D.(axPnts);
 
 			/* DRAW */
