@@ -373,6 +373,10 @@ METHOD:: pointsNorm
 Return the link::Classes/Array:: of link::Classes/Cartesian:: points used
 internally for plotting. i.e. normalized to a radius of 1.
 
+METHOD:: pointsPx
+Return the link::Classes/Array:: as link::Classes/Point::s, in pixels,
+relative to the center of the view. I.e. left of center will be a negative X
+value and above center will be a negative Y value.
 
 SUBSECTION:: Other
 

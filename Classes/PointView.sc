@@ -3,6 +3,7 @@ PointView : View {
 	var <pointsNorm; // points normalized to rho = 1
 	var <connections;
 	var axisPnts;
+	var <pointsPx; // pixel location of each point relative to view center point (0,0)
 
 	// drawing
 	var <cen, <minDim;
@@ -650,6 +651,7 @@ PointView : View {
 
 			// transform 3D positions to 2D points with perspective
 			pnts_xf = to2D.(pnts);
+			pointsPx = pnts_xf;        // set instance var for access outside drawFunc
 			axPnts_xf = to2D.(axPnts);
 
 			/* DRAW */
