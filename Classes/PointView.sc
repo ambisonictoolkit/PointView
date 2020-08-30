@@ -46,7 +46,7 @@ PointView : View {
 	var <rotateMode;       // \rtt or \ypr
 	var <randomizedAxes;   // dictionary of booleans for randomize state of each axis
 	var <>randomVariance;  // normalized value to apply to movement speed if randomized
-	var extrinsicRotation = false; // flag if mouse interaction requires additional extrinsic rotation
+	var <>extrinsicRotation = false; // flag if mouse interaction requires additional extrinsic rotation
 	var exRot = 0, exTum = 0, prevExRot = 0, prevExTum = 0;
 	var rotPxStep = 1;
 
